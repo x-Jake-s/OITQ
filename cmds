@@ -1,0 +1,363 @@
+package me.kale.oitq.cmdExecutors;
+
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import me.kale.oitq.ArenaManager.ArenaRunner;
+import me.kale.oitq.ArenaManager.ArenaStorage;
+import me.kale.oitq.ArenaManager.LeaveEnum;
+import me.kale.oitq.Main;
+import me.kale.oitq.Utilities.Util;
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
+import org.bukkit.Server;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.CommandSender;
+import org.bukkit.command.ConsoleCommandSender;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.PluginLoader;
+import org.bukkit.plugin.PluginManager;
+
+public class OITQCommandExecutor
+  implements CommandExecutor
+{
+  private Main plugin;
+  
+  public OITQCommandExecutor(Main plugin)
+  {
+    this.plugin = plugin;
+  }
+  
+  public boolean onCommand(CommandSender sender, Command command, String label, String[] args)
+  {
+    String prefix1 = this.plugin.getConfig().getString("Prefix") + " ";
+    String prefix = ChatColor.translateAlternateColorCodes('&', prefix1) + ChatColor.RED;
+    String np = prefix + ChatColor.DARK_RED + "No permission.";
+    Player player = (Player)sender;
+    String cmd = command.getName();
+    if ((cmd.equalsIgnoreCase("oitq")) && (!(player instanceof Player)))
+    {
+      player.sendMessage(prefix + "This is a Player only command.");
+    }
+    else
+    {
+      if (args.length == 0)
+      {
+        player.sendMessage("");
+        player.sendMessage("");
+        player.sendMessage(ChatColor.GRAY + "�n--------" + ChatColor.AQUA + "OITQ" + ChatColor.GRAY + ChatColor.STRIKETHROUGH + "�n--------");
+        player.sendMessage(ChatColor.AQUA + "/oitq lobby" + ChatColor.GREEN + " | " + ChatColor.DARK_GREEN + "Takes you to the SOITC Lobby.");
+        player.sendMessage(ChatColor.AQUA + "/oitq leave" + ChatColor.GREEN + " | " + ChatColor.DARK_GREEN + "Leaves a game of SOITC.");
+        player.sendMessage(ChatColor.AQUA + "/oitq reload" + ChatColor.GREEN + " | " + ChatColor.DARK_GREEN + "Reloads the configs.");
+        player.sendMessage(ChatColor.AQUA + "/oitq list" + ChatColor.GREEN + " | " + ChatColor.DARK_GREEN + "Lists all the Arenas.");
+        player.sendMessage(ChatColor.AQUA + "/oitq setmainlobby" + ChatColor.GREEN + " | " + ChatColor.DARK_GREEN + " Sets the Main Lobby");
+        player.sendMessage(ChatColor.AQUA + "/oitq join [arenaName]" + ChatColor.GREEN + " | " + ChatColor.DARK_GREEN + "Joins an arena if no sign is present.");
+        player.sendMessage(ChatColor.AQUA + "/oitq create [arenaName]" + ChatColor.GREEN + " | " + ChatColor.DARK_GREEN + "Creates a new Arena");
+        player.sendMessage(ChatColor.AQUA + "/oitq delete [arenaName]" + ChatColor.GREEN + " | " + ChatColor.DARK_GREEN + "Deletes an Arena");
+        player.sendMessage(ChatColor.AQUA + "/oitq addspawn [arenaName]" + ChatColor.GREEN + " | " + ChatColor.DARK_GREEN + "Adds a spawn for the Arena");
+        player.sendMessage(ChatColor.AQUA + "/oitq setgamelobby [arenaName]" + ChatColor.GREEN + " | " + ChatColor.DARK_GREEN + " Sets the Lobby of the Arena.");
+        player.sendMessage(ChatColor.AQUA + "/oitq stop [arenaName]" + ChatColor.GREEN + " | " + ChatColor.DARK_GREEN + "Force stops the Arena");
+        player.sendMessage(ChatColor.AQUA + "/oitq start [arenaName]" + ChatColor.GREEN + " | " + ChatColor.DARK_GREEN + "Force starts the Arena");
+        player.sendMessage(ChatColor.GRAY + "�n--------" + ChatColor.AQUA + "OITQ" + ChatColor.GRAY + ChatColor.STRIKETHROUGH + "�n--------");
+      }
+      if (args.length == 1)
+      {
+        if (args[0].equalsIgnoreCase("setmainlobby")) {
+          if (player.hasPermission("oitq.setmainlobby"))
+          {
+            Util.setLobby(player.getLocation());
+            player.sendMessage(prefix + ChatColor.RED + "Main lobby set.");
+          }
+          else
+          {
+            sender.sendMessage(np);
+          }
+        }
+        if (args[0].equalsIgnoreCase("lobby")) {
+          if (!ArenaStorage.isInArena(player))
+          {
+            if (Util.getLobby() != null)
+            {
+              player.teleport(Util.getLobby());
+              player.sendMessage(prefix + ChatColor.RED + "You have been taken to the " + ChatColor.DARK_AQUA + "OITQ Lobby!");
+            }
+            else
+            {
+              player.sendMessage(prefix + ChatColor.RED + "The main lobby hasn't been setup yet, contact an admin for support.");
+            }
+          }
+          else
+          {
+            ArenaRunner arena = ArenaStorage.getArena(player);
+            player.sendMessage(prefix + ChatColor.RED + "You have left your current arena and joined the lobby.");
+            arena.removePlayer(player, LeaveEnum.QUIT);
+          }
+        }
+        if (args[0].equalsIgnoreCase("leave")) {
+          if (ArenaStorage.isInArena(player))
+          {
+            ArenaRunner arena = ArenaStorage.getArena(player);
+            arena.removePlayer(player, LeaveEnum.QUIT);
+          }
+          else
+          {
+            player.sendMessage(prefix + ChatColor.RED + "You are not in a game.");
+          }
+        }
+        if (args[0].equalsIgnoreCase("reload")) {
+          if (player.hasPermission("oitq.reload"))
+          {
+            Util.loadYamls();
+            this.plugin.saveDefaultConfig();
+            Bukkit.getServer().getPluginManager().getPlugin("OITQ")
+              .getPluginLoader().disablePlugin(this.plugin);
+            Bukkit.getServer().getPluginManager().getPlugin("OITQ")
+              .getPluginLoader().enablePlugin(this.plugin);
+            for (ArenaRunner arena : ArenaStorage.getArenas()) {
+              arena.updateSigns();
+            }
+            player.sendMessage(prefix + ChatColor.RED + 
+              "Reloaded Configs Successfully!");
+          }
+          else
+          {
+            sender.sendMessage(np);
+          }
+        }
+        if (args[0].equalsIgnoreCase("list")) {
+          if (player.hasPermission("oitq.list"))
+          {
+            String arenas1 = prefix + "List of Arenas - " + 
+              ChatColor.DARK_AQUA;
+            Iterator localIterator = ArenaStorage.getArenas()
+              .iterator();
+            while (localIterator.hasNext())
+            {
+              ArenaRunner arena = (ArenaRunner)localIterator.next();
+              arenas1 = arenas1 + arena.getName() + ", ";
+            }
+            player.sendMessage(arenas1);
+          }
+          else
+          {
+            player.sendMessage(np);
+          }
+        }
+      }
+      if (args.length == 2)
+      {
+        if (args[0].equalsIgnoreCase("setgamelobby")) {
+          if (player.hasPermission("oitq.setgamelobby"))
+          {
+            if (args.length < 2)
+            {
+              sender.sendMessage(prefix + "Usage: /oitq setgamelobby [arenaName]");
+            }
+            else if (ArenaStorage.arenaExists(args[1]))
+            {
+              ArenaRunner arena = ArenaStorage.getArena(args[1]);
+              arena.setLobbySpawn(player.getLocation());
+              player.sendMessage(prefix + ChatColor.RED + "You have set the lobby spawn for " + ChatColor.DARK_AQUA + arena.getName());
+            }
+            else
+            {
+              player.sendMessage(prefix + ChatColor.RED + "There is no arena named " + ChatColor.RED + args[1]);
+            }
+          }
+          else {
+            sender.sendMessage(np);
+          }
+        }
+        if (args[0].equalsIgnoreCase("stop")) {
+          if (sender.hasPermission("oitq.stop"))
+          {
+            if (args.length < 2)
+            {
+              sender.sendMessage(prefix + "Usage: /oitq stop [arenaName]");
+            }
+            else if (ArenaStorage.arenaExists(args[1]))
+            {
+              ArenaRunner arena = ArenaStorage.getArena(args[1]);
+              arena.sendAll(prefix + ChatColor.RED + player.getName() + ChatColor.GRAY + " Has stopped the Arena!");
+              arena.stop();
+            }
+            else
+            {
+              player.sendMessage(prefix + ChatColor.RED + "There is no arena named " + ChatColor.RED + args[1]);
+            }
+          }
+          else {
+            sender.sendMessage(np);
+          }
+        }
+        if (args[0].equalsIgnoreCase("start")) {
+          if (player.hasPermission("oitq.start"))
+          {
+            if (args.length < 2)
+            {
+              sender.sendMessage(prefix + "Usage: /oitq start [arenaName]");
+            }
+            else if (ArenaStorage.arenaExists(args[1]))
+            {
+              ArenaRunner arena = ArenaStorage.getArena(args[1]);
+              if (arena.getPlayers().size() >= 1)
+              {
+                arena.start();
+                player.sendMessage(prefix + ChatColor.RED + "You have started the arena " + ChatColor.DARK_AQUA + arena.getName());
+              }
+              else
+              {
+                player.sendMessage(prefix + ChatColor.RED + "Cannot start arena.");
+                player.sendMessage(prefix + ChatColor.RED + "It is either ingame, stopping, or not enough players.");
+              }
+            }
+            else
+            {
+              player.sendMessage(prefix + ChatColor.RED + "There is no arena named " + ChatColor.RED + args[1]);
+            }
+          }
+          else {
+            player.sendMessage(np);
+          }
+        }
+        if (args[0].equalsIgnoreCase("addspawn")) {
+          if (sender.hasPermission("oitq.addspawn"))
+          {
+            if (args.length < 2)
+            {
+              sender.sendMessage(prefix + "Usage: /oitq addspawn [arenaName]");
+            }
+            else if (ArenaStorage.arenaExists(args[1]))
+            {
+              ArenaRunner arena = ArenaStorage.getArena(args[1]);
+              arena.addSpawn(player.getLocation());
+              player.sendMessage(prefix + ChatColor.RED + "You have added a spawn for " + ChatColor.DARK_AQUA + arena.getName());
+            }
+            else
+            {
+              player.sendMessage(prefix + ChatColor.RED + "There is no arena named " + ChatColor.RED + args[1]);
+            }
+          }
+          else {
+            player.sendMessage(np);
+          }
+        }
+        if (args[0].equalsIgnoreCase("delete")) {
+          if (sender.hasPermission("oitq.delete"))
+          {
+            if (args.length < 2)
+            {
+              sender.sendMessage(prefix + "Usage: /oitq delete [arenaName]");
+            }
+            else if (this.plugin.getConfig().contains(args[1]))
+            {
+              this.plugin.getConfig().set(args[1], null);
+              this.plugin.arenas.set("Arenas." + args[1], null);
+              this.plugin.arenas.set("Arenas.List" + args[1], null);
+              if (ArenaStorage.list.contains(args[1])) {
+                ArenaStorage.list.remove(args[1]);
+              }
+              if (ArenaStorage.arenas.containsKey(args[1]))
+              {
+                ArenaStorage.arenas.remove(args[1]);
+                if (this.plugin.arenas.contains("Arenas.List"))
+                {
+                  List<String> list = this.plugin.arenas.getStringList("Arenas.List");
+                  list.remove(args[1]);
+                  this.plugin.arenas.set("Arenas.List", list);
+                }
+                Util.saveYamls();
+                Util.loadYamls();
+                this.plugin.saveConfig();
+                this.plugin.reloadConfig();
+                Bukkit.getServer().getConsoleSender().sendMessage("Arena was removed!");
+                player.sendMessage(prefix + ChatColor.RED + "You have deleted " + ChatColor.DARK_RED + args[1]);
+                Bukkit.getServer().getPluginManager().getPlugin("OITQ");
+              }
+              else
+              {
+                player.sendMessage(prefix + ChatColor.RED + "There is no arena named " + ChatColor.RED + args[1]);
+              }
+            }
+          }
+          else {
+            sender.sendMessage(np);
+          }
+        }
+        if (args[0].equalsIgnoreCase("create")) {
+          if (player.hasPermission("oitq.create"))
+          {
+            if (args.length < 2)
+            {
+              sender.sendMessage(prefix + "Usage: /oitq create [arenaName]");
+            }
+            else if (!ArenaStorage.arenaExists(args[1]))
+            {
+              this.plugin.arenas.addDefault("Arenas." + args[1], args[1]);
+              this.plugin.arenas.addDefault("Arenas." + args[1] + ".Signs.Counter", Integer.valueOf(0));
+              this.plugin.getConfig().addDefault(args[1] + ".Countdown", Integer.valueOf(20));
+              this.plugin.getConfig().addDefault(args[1] + ".MaxPlayers", Integer.valueOf(16));
+              this.plugin.getConfig().addDefault(args[1] + ".KillsToWin", Integer.valueOf(20));
+              this.plugin.getConfig().addDefault(args[1] + ".AutoStartPlayers", Integer.valueOf(12));
+              this.plugin.getConfig().addDefault(args[1] + ".EndTime", Integer.valueOf(1200));
+              ArenaRunner arena = new ArenaRunner(args[1]);
+              ArenaStorage.addArena(arena);
+              Util.addToList(arena);
+              player.sendMessage(prefix + "You have created the Arena " + ChatColor.GOLD + arena.getName());
+              Util.saveYamls();
+              this.plugin.saveConfig();
+            }
+            else
+            {
+              player.sendMessage(prefix + ChatColor.RED + "That Arena already Exists!");
+            }
+          }
+          else {
+            sender.sendMessage(np);
+          }
+        }
+        if (args[0].equalsIgnoreCase("join")) {
+          if (args.length < 2) {
+            sender.sendMessage(prefix + "Usage: /oitq join [arenaName]");
+          } else if (args[1].equalsIgnoreCase(args[1])) {
+            if (ArenaStorage.arenaExists(args[1]))
+            {
+              if (ArenaStorage.isInArena(player))
+              {
+                player.sendMessage(prefix + ChatColor.RED + "You are already in an Arena!");
+                player.sendMessage(prefix + ChatColor.GRAY + "If you would like to leave the current arena you are in, do /s leave");
+              }
+              else
+              {
+                for (Object arenas = ArenaStorage.getArenas().iterator(); ((Iterator)arenas).hasNext();)
+                {
+                  ArenaRunner arena = (ArenaRunner)((Iterator)arenas).next();
+                  if (arena.getMaxPlayers() > arena.getPlayers().size())
+                  {
+                    arena.addPlayer(player);
+                    player.sendMessage(prefix + "You have joined " + ChatColor.GREEN + args[1]);
+                  }
+                  else if (!player.hasPermission("oitq.vip"))
+                  {
+                    player.sendMessage(prefix + "That arena is full.");
+                  }
+                  else
+                  {
+                    arena.addPlayer(player);
+                  }
+                }
+              }
+            }
+            else {
+              sender.sendMessage(prefix + ChatColor.GREEN + args[1] + ChatColor.RED + " Does not exist.");
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+}
